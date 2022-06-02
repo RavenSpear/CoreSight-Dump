@@ -1,40 +1,8 @@
 #include <linux/module.h>
 #include <linux/init.h>
-#include <linux/fs.h>
-#include <linux/device.h>
-#include <linux/miscdevice.h>
 #include <asm/io.h>
 
-#define AXI_LITE_WIDTH      4
-#define AXI_LITE_BASE       0xA0000000
-#define AXI_LITE_REG_NUM    16
-
-static void __iomem *axi_data_ptr[AXI_LITE_REG_NUM]; 
-
-static int coresight_dump_open(struct inode *inode, struct file *filp)  
-{
-    printk("CoreSight Dump dev is open!...\n");
-    return 0;
-}
-
-
-
-static int coresight_dump_print(void){
-        int i;
-        u32 data;
-        printk("Reading CoreSight Raw Data...");
-        for(i = 0;i<AXI_LITE_REG_NUM;i++){
-                data = readl(axi_data_ptr[i]);
-                printk(KERN_CONT "%x ",data);
-        }
-        printk("Reading Ended...");
-        return 0;
-}
-
-static ssize_t coresight_dump_read(struct file *file, char __user *buff, size_t count, loff_t *ppos){
-        coresight_dump_print();
-        return 0;
-}
+#include "coresight-dump.h"
 
 static const struct file_operations coresight_dump_fops = {
         .owner = THIS_MODULE,
@@ -47,6 +15,8 @@ static struct miscdevice coresight_dump_dev = {
         .name = "coresight_dump_dev",
         .fops = &coresight_dump_fops,
 };
+
+static void __iomem *axi_data_ptr[AXI_LITE_REG_NUM]; 
 
 static int __init coresight_dump_init(void){
         int i;
@@ -70,6 +40,33 @@ static void __exit coresight_dump_exit(void){
         printk("CoreSight Dump exit.");
 }
 
+static int coresight_dump_open(struct inode *inode, struct file *filp)  
+{
+    printk("CoreSight Dump dev is open!...\n");
+    return 0;
+}
+
+static ssize_t coresight_dump_read(struct file *file, char __user *buff, size_t count, loff_t *ppos){
+        coresight_dump_print();
+        return 0;
+}
+
+static int coresight_dump_print(void){
+        int i;
+        u32 data;
+        printk("Reading CoreSight Raw Data...\n\r");
+        for(i = 0;i<AXI_LITE_REG_NUM;i++){
+                data = readl(axi_data_ptr[i]);
+                printk(KERN_CONT "%x ",data);
+        }
+        printk("Reading Ended...");
+        return 0;
+}
+
+// static irqreturn_t coresight_dump_irq_handler(int irq, void *dev_id){
+//         printk();
+//         return IRQ_HANDLED;
+// }
 
 module_init(coresight_dump_init);
 module_exit(coresight_dump_exit);
