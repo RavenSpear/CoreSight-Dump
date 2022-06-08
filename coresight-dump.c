@@ -11,16 +11,16 @@ static const struct file_operations coresight_dump_fops = {
         .read = coresight_dump_read
 };
 static struct miscdevice coresight_dump_dev = {
-    .minor = MISC_DYNAMIC_MINOR,
-    .name = "coresight_dump_dev",  /* 指明/dev/目录下的设备节点名 */
-    .fops = &coresight_dump_fops,
+        .minor = MISC_DYNAMIC_MINOR,
+        .name = "coresight_dump_dev",
+        .fops = &coresight_dump_fops,
 };
 
 static const struct of_device_id coresight_dump_match[] = {
-	{.compatible = "xlnx,DMA-AXI-LiTE-1.0"},
+	{.compatible = "xlnx,CoreSight-Dump-1.0"},
 	{}
 };
-MODULE_DEVICE_TABLE(of, coresight_dump_match);
+
 static struct platform_driver coresight_dump_driver = {
         .probe = coresight_dump_probe,
         .remove = coresight_dump_remove,
@@ -31,8 +31,7 @@ static struct platform_driver coresight_dump_driver = {
         }
 };
 
-
-static void __iomem *axi_data_ptr[AXI_LITE_REG_NUM]; 
+static struct coresight_dump_data cs_dp_data;
 
 static int __init coresight_dump_init(void){
         int i;
@@ -94,24 +93,50 @@ static int coresight_dump_open(struct inode *inode, struct file *filp)
 }
 
 static ssize_t coresight_dump_read(struct file *file, char __user *buff, size_t count, loff_t *ppos){
+        coresight_dump_fetch_data();
         coresight_dump_print();
         return 0;
 }
 
+static void coresight_dump_fetch_data(void){
+        int i;
+
+        cs_dp_data.bug_num = readl(axi_data_ptr[BUG_NUM_INDEX]);
+
+        for(i = SUCCEED_DATA_INDEX;i < SUCCEED_DATA_INDEX + SUCCEED_DATA_NUM;i++){
+                cs_dp_data.succeed_data[i-SUCCEED_DATA_INDEX] = readl(axi_data_ptr[i]);
+        }
+        for(i = PROCEED_DATA_INDEX;i < PROCEED_DATA_INDEX + PROCEED_DATA_NUM;i++){
+                cs_dp_data.proceed_data[i-PROCEED_DATA_INDEX] = readl(axi_data_ptr[i]);
+        }
+        for(i = FRAME_INDEX;i < FRAME_INDEX + FRAME_NUM;i++){
+                cs_dp_data.frame[i-FRAME_INDEX] = readl(axi_data_ptr[i]);
+        }
+}
+
 static int coresight_dump_print(void){
         int i;
-        u32 data;
-        printk("Reading CoreSight Raw Data...\n\r");
-        for(i = 0;i<AXI_LITE_REG_NUM;i++){
-                data = readl(axi_data_ptr[i]);
-                printk(KERN_CONT "%x ",data);
+        printk("Print CoreSight Raw Data...");
+        printk("Bug Type: %x\n",cs_dp_data.bug_num);
+        printk(KERN_CONT "Frame: ");
+        for(i = 0;i < FRAME_NUM;i++){
+                printk(KERN_CONT "%x ",cs_dp_data.frame[i]);
         }
-        printk("Reading Ended...");
+        printk(KERN_CONT "Dump Data: ");
+        for(i = 0;i < PROCEED_DATA_NUM;i++){
+                printk(KERN_CONT "%x ",cs_dp_data.proceed_data[i]);
+        }
+        printk(KERN_CONT "[ %x ] ",cs_dp_data.succeed_data[0]);
+        for(i = 1;i < SUCCEED_DATA_NUM;i++){
+                printk(KERN_CONT "%x ",cs_dp_data.succeed_data[i]);
+        }
+        printk("Print Done...");
         return 0;
 }
 
 static irqreturn_t coresight_dump_irq_handler(int irq, void *dev_id){
         printk("irq = %d\n", irq);
+        coresight_dump_fetch_data();
         coresight_dump_print();
         return IRQ_HANDLED;
 }
@@ -123,3 +148,4 @@ module_exit(coresight_dump_exit);
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_AUTHOR("Fan Wang");
 MODULE_DESCRIPTION("AXI-Lite based device for dumping CoreSight raw data.");
+MODULE_DEVICE_TABLE(of, coresight_dump_match);
