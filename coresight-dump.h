@@ -31,4 +31,5 @@ static int coresight_dump_open(struct inode *, struct file *);
 static ssize_t coresight_dump_read(struct file *, char __user *, size_t, loff_t *);
 static void coresight_dump_fetch_data(void);
 static int coresight_dump_print(void);
+static int coresight_dump_print_raw(void);
 static irqreturn_t coresight_dump_irq_handler(int, void *);

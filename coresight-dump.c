@@ -95,6 +95,7 @@ static int coresight_dump_open(struct inode *inode, struct file *filp)
 static ssize_t coresight_dump_read(struct file *file, char __user *buff, size_t count, loff_t *ppos){
         coresight_dump_fetch_data();
         coresight_dump_print();
+        //coresight_dump_print_raw();
         return 0;
 }
 
@@ -107,7 +108,9 @@ static void coresight_dump_fetch_data(void){
                 cs_dp_data.succeed_data[i-SUCCEED_DATA_INDEX] = readl(axi_data_ptr[i]);
         }
         for(i = PROCEED_DATA_INDEX;i < PROCEED_DATA_INDEX + PROCEED_DATA_NUM;i++){
-                cs_dp_data.proceed_data[i-PROCEED_DATA_INDEX] = readl(axi_data_ptr[i]);
+                cs_dp_data.proceed_data[PROCEED_DATA_NUM - i + PROCEED_DATA_INDEX - 1] = readl(axi_data_ptr[i]);
+                //printk(KERN_CONT "i: %d, index: %d, proceed data: %x. ",i,PROCEED_DATA_NUM - i + PROCEED_DATA_INDEX - 1,data);
+                //cs_dp_data.proceed_data[i-PROCEED_DATA_INDEX] = readl(axi_data_ptr[i]);
         }
         for(i = FRAME_INDEX;i < FRAME_INDEX + FRAME_NUM;i++){
                 cs_dp_data.frame[i-FRAME_INDEX] = readl(axi_data_ptr[i]);
@@ -122,13 +125,26 @@ static int coresight_dump_print(void){
         for(i = 0;i < FRAME_NUM;i++){
                 printk(KERN_CONT "%x ",cs_dp_data.frame[i]);
         }
-        printk(KERN_CONT "Dump Data: ");
-        for(i = 0;i < PROCEED_DATA_NUM;i++){
+        printk(KERN_CONT "\nDump Data: ");
+        for(i = 0;i < PROCEED_DATA_NUM - 1;i++){
                 printk(KERN_CONT "%x ",cs_dp_data.proceed_data[i]);
         }
-        printk(KERN_CONT "[ %x ] ",cs_dp_data.succeed_data[0]);
-        for(i = 1;i < SUCCEED_DATA_NUM;i++){
+        /*focus the trace_data[31:0] which triggers the dump.*/
+        printk(KERN_CONT "[ %x ] ",cs_dp_data.proceed_data[PROCEED_DATA_NUM - 1]);
+        for(i = 0;i < SUCCEED_DATA_NUM;i++){
                 printk(KERN_CONT "%x ",cs_dp_data.succeed_data[i]);
+        }
+        printk("Print Done...");
+        return 0;
+}
+
+static int coresight_dump_print_raw(void){
+        int i;
+        u32 data;
+        printk("Print CoreSight Raw Data undecoded...\n");
+        for(i = 0;i < AXI_LITE_REG_NUM;i++){
+                data = readl(axi_data_ptr[i]);
+                printk(KERN_CONT "%x ",data);
         }
         printk("Print Done...");
         return 0;
@@ -138,6 +154,7 @@ static irqreturn_t coresight_dump_irq_handler(int irq, void *dev_id){
         printk("irq = %d\n", irq);
         coresight_dump_fetch_data();
         coresight_dump_print();
+        //coresight_dump_print_raw();
         return IRQ_HANDLED;
 }
 
